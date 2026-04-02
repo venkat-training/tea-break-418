@@ -1,7 +1,11 @@
 import { pickOne } from '@/lib/utils/random';
 import { BLOCK_MESSAGES } from '@/lib/constants';
 import type { MatchState, TeaState } from '@/lib/schemas/domain';
-import { actionBlockedByRules, teaModeModifier } from './teaRules';
+import {
+  actionBlockedByRules,
+  teaModeModifier,
+  COMPLIANCE_THRESHOLD
+} from './teaRules';
 
 export function computeComplianceScore(teaState: TeaState): number {
   const base =
@@ -12,11 +16,19 @@ export function computeComplianceScore(teaState: TeaState): number {
   return Math.max(0, Math.min(100, Math.round(base + teaModeModifier(teaState.teaMode))));
 }
 
+export function getComplianceGrade(score: number): 'CRITICAL' | 'WARNING' | 'NOMINAL' | 'OPTIMAL' {
+  if (score < 40) return 'CRITICAL';
+  if (score < COMPLIANCE_THRESHOLD) return 'WARNING';
+  if (score < 80) return 'NOMINAL';
+  return 'OPTIMAL';
+}
+
 export function evaluateAction(action: string, teaState: TeaState, matchState: MatchState) {
   const reasons = actionBlockedByRules(action, teaState, matchState);
   const score = computeComplianceScore(teaState);
+  const grade = getComplianceGrade(score);
 
-  if (reasons.length > 0 || score < 60) {
+  if (reasons.length > 0 || score < COMPLIANCE_THRESHOLD) {
     return {
       allowed: false,
       status: 418,
@@ -24,10 +36,13 @@ export function evaluateAction(action: string, teaState: TeaState, matchState: M
         code: 'TEA_BREAK_ENFORCED',
         title: "I'm a teapot",
         message: pickOne(BLOCK_MESSAGES),
-        recoveryAction: 'Wait for kettle readiness or add biscuits.'
+        recoveryAction:
+          'Increase kettle readiness above 65%, ensure biscuit coverage ≥ 50%, and wait for tea window to close.',
+        details: reasons.length > 0 ? reasons : [`Compliance score ${score} below threshold ${COMPLIANCE_THRESHOLD}.`]
       },
       reasons,
-      score
+      score,
+      grade
     };
   }
 
@@ -37,7 +52,8 @@ export function evaluateAction(action: string, teaState: TeaState, matchState: M
     data: {
       action,
       recommendation: 'Action approved by Tea Compliance Engine.',
-      score
+      score,
+      grade
     }
   };
 }

@@ -17,3 +17,6 @@ export const tacticalActionSchema = z.object({
   teaState: teaStateSchema,
   matchState: matchStateSchema
 });
+
+export type ComplianceRequest = z.infer<typeof complianceRequestSchema>;
+export type TacticalAction = z.infer<typeof tacticalActionSchema>;
