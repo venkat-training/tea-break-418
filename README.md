@@ -24,8 +24,8 @@ pnpm dev
 ## Scripts
 - `pnpm lint`
 - `pnpm typecheck`
-- `pnpm test`
-- `pnpm test:e2e`
+- `pnpm test` (unit and integration tests)
+- `pnpm test:e2e` (end-to-end tests, requires desktop environment with GUI libraries)
 - `pnpm build`
 
 ## Docs

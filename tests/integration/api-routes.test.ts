@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { POST as tacticalPost } from '@/app/api/tactical-action/route';
+import { POST as compliancePost } from '@/app/api/tea-compliance/route';
 import { SEEDED_MATCH, SEEDED_TEA } from '@/lib/constants';
 
 describe('api routes', () => {
@@ -13,13 +14,16 @@ describe('api routes', () => {
     expect(response.status).toBe(418);
   });
 
-  it('returns 400 for invalid payload', async () => {
-    const req = new Request('http://localhost/api/tactical-action', {
+  it('returns compliance score for tea compliance', async () => {
+    const req = new Request('http://localhost/api/tea-compliance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'bad' })
+      body: JSON.stringify(SEEDED_TEA)
     });
-    const response = await tacticalPost(req);
-    expect(response.status).toBe(400);
+    const response = await compliancePost(req);
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json.success).toBe(true);
+    expect(json.data.complianceScore).toBeDefined();
   });
 });
