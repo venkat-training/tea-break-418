@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ComplianceAlerts } from '@/components/alerts/ComplianceAlerts';
 import { ComplianceCard } from '@/components/compliance/ComplianceCard';
 import { TeaModeSelector } from '@/components/compliance/TeaModeSelector';
@@ -17,6 +18,7 @@ import { TeapotBadge } from '@/components/tea/TeapotBadge';
 import { TeaStatusPanel } from '@/components/tea/TeaStatusPanel';
 import { SEEDED_MATCH, SEEDED_TEA } from '@/lib/constants';
 import { computeComplianceScore } from '@/lib/domain/complianceEngine';
+import type { TeaState } from '@/lib/schemas/domain';
 
 const actions = [
   'Recommend Batting Aggression',
@@ -27,7 +29,8 @@ const actions = [
 ] as const;
 
 export default function HomePage() {
-  const [teaState, setTeaState] = useState(SEEDED_TEA);
+  const router = useRouter();
+  const [teaState, setTeaState] = useState<TeaState>(SEEDED_TEA);
   const [response, setResponse] = useState<unknown>({ success: true, data: { message: 'Awaiting tactical instruction.' } });
   const score = useMemo(() => computeComplianceScore(teaState), [teaState]);
 
@@ -41,11 +44,35 @@ export default function HomePage() {
     setResponse(json);
   };
 
+  const handleStartMatch = async () => {
+    const res = await fetch('/api/toss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teaState, matchState: SEEDED_MATCH })
+    });
+    const json = await res.json();
+    setResponse(json);
+  };
+
+  const handleTriggerAudit = async () => {
+    const res = await fetch('/api/tea-compliance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(teaState)
+    });
+    const json = await res.json();
+    setResponse(json);
+  };
+
+  const handleViewDemo = () => {
+    router.push('/demo');
+  };
+
   return (
     <div>
       <AppHeader />
       <DashboardShell>
-        <Hero />
+        <Hero onStartMatch={handleStartMatch} onTriggerAudit={handleTriggerAudit} onViewDemo={handleViewDemo} />
         <TeapotBadge />
         <ScoreboardCard
           teams={SEEDED_MATCH.teams}

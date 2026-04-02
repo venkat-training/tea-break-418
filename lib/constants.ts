@@ -1,3 +1,5 @@
+import type { TeaState } from './schemas/domain';
+
 export const APP_NAME = 'Tea Break 418';
 export const TAGLINE =
   'The only cricket operations platform that treats tea compliance as a production dependency.';
@@ -12,7 +14,7 @@ export const SEEDED_MATCH = {
   matchStatus: 'Mid-innings stabilization'
 };
 
-export const SEEDED_TEA = {
+export const SEEDED_TEA: TeaState = {
   teaMode: 'Masala Chai',
   kettleReadiness: 58,
   biscuitCoverage: 47,
