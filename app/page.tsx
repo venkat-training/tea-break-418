@@ -32,36 +32,59 @@ export default function HomePage() {
   const router = useRouter();
   const [teaState, setTeaState] = useState<TeaState>(SEEDED_TEA);
   const [response, setResponse] = useState<unknown>({ success: true, data: { message: 'Awaiting tactical instruction.' } });
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const score = useMemo(() => computeComplianceScore(teaState), [teaState]);
 
+  const callApi = async (label: string, url: string, body: unknown) => {
+    setPendingAction(label);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const json = await res.json().catch(() => ({}));
+      setResponse({
+        ...json,
+        meta: {
+          action: label,
+          httpStatus: res.status,
+          ok: res.ok,
+          at: new Date().toISOString()
+        }
+      });
+    } catch {
+      setResponse({
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          title: 'Request failed',
+          message: 'Could not reach API route. Check dev server logs and retry.',
+          recoveryAction: 'Ensure local server is running and reachable.'
+        },
+        meta: {
+          action: label,
+          httpStatus: null,
+          ok: false,
+          at: new Date().toISOString()
+        }
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
   const runAction = async (action: (typeof actions)[number]) => {
-    const res = await fetch('/api/tactical-action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, teaState, matchState: SEEDED_MATCH })
-    });
-    const json = await res.json();
-    setResponse(json);
+    await callApi(action, '/api/tactical-action', { action, teaState, matchState: SEEDED_MATCH });
   };
 
   const handleStartMatch = async () => {
-    const res = await fetch('/api/toss', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teaState, matchState: SEEDED_MATCH })
-    });
-    const json = await res.json();
-    setResponse(json);
+    await callApi('Start Match', '/api/toss', { teaState, matchState: SEEDED_MATCH });
   };
 
   const handleTriggerAudit = async () => {
-    const res = await fetch('/api/tea-compliance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(teaState)
-    });
-    const json = await res.json();
-    setResponse(json);
+    await callApi('Trigger Emergency Tea Audit', '/api/tea-compliance', teaState);
   };
 
   const handleViewDemo = () => {
@@ -72,7 +95,12 @@ export default function HomePage() {
     <div>
       <AppHeader />
       <DashboardShell>
-        <Hero onStartMatch={handleStartMatch} onTriggerAudit={handleTriggerAudit} onViewDemo={handleViewDemo} />
+        <Hero
+          isBusy={Boolean(pendingAction)}
+          onStartMatch={handleStartMatch}
+          onTriggerAudit={handleTriggerAudit}
+          onViewDemo={handleViewDemo}
+        />
         <TeapotBadge />
         <ScoreboardCard
           teams={SEEDED_MATCH.teams}
@@ -96,11 +124,12 @@ export default function HomePage() {
         </div>
         <section className='grid gap-2 md:grid-cols-3'>
           {actions.map((action) => (
-            <Button key={action} onClick={() => runAction(action)}>
+            <Button disabled={Boolean(pendingAction)} key={action} onClick={() => runAction(action)}>
               {action}
             </Button>
           ))}
         </section>
+        {pendingAction ? <p className='text-sm text-slate-600'>Running: {pendingAction}…</p> : null}
         <TeaActionConsole response={response} />
         <ComplianceAlerts />
       </DashboardShell>

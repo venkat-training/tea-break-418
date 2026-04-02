@@ -11,7 +11,19 @@ export async function POST(req: Request) {
 
   const result = runTossAnalysis(parsed.data.teaState, parsed.data.matchState);
   if (!result.allowed) {
-    return NextResponse.json({ success: false, error: result.error }, { status: 418 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: result.error,
+        data: {
+          blocked: true,
+          complianceScore: result.score,
+          reasons: result.reasons,
+          canonicalStatus: 418
+        }
+      },
+      { status: 200 }
+    );
   }
   return NextResponse.json({ success: true, data: result.data });
 }

@@ -10,8 +10,9 @@ HTTP 418 comes from an April Fools RFC and is perfect for a cricket control plan
 ## Features
 - Premium dashboard UX with cricket match state.
 - Hero buttons for quick actions: Start Match, Emergency Tea Audit, View Demo.
+- Hero actions stream structured response metadata (action name, timestamp, and HTTP status) to the on-page console.
 - Tea Compliance Engine with deterministic policy logic.
-- Tactical actions with structured 418 failure payloads.
+- Tactical actions with structured 418 policy payloads (transport-safe for interactive UX on the home page).
 - API routes validated with Zod.
 - Unit/integration/e2e smoke tests.
 

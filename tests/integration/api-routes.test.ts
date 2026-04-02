@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { POST as tacticalPost } from '@/app/api/tactical-action/route';
 import { POST as compliancePost } from '@/app/api/tea-compliance/route';
+import { POST as tossPost } from '@/app/api/toss/route';
 import { SEEDED_MATCH, SEEDED_TEA } from '@/lib/constants';
 
 describe('api routes', () => {
@@ -25,5 +26,19 @@ describe('api routes', () => {
     const json = await response.json();
     expect(json.success).toBe(true);
     expect(json.data.complianceScore).toBeDefined();
+  });
+
+  it('returns handled toss block payload without transport error status', async () => {
+    const req = new Request('http://localhost/api/toss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teaState: SEEDED_TEA, matchState: SEEDED_MATCH })
+    });
+    const response = await tossPost(req);
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json.success).toBe(false);
+    expect(json.data.canonicalStatus).toBe(418);
+    expect(json.data.blocked).toBe(true);
   });
 });
