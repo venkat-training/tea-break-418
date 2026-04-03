@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ComplianceAlerts } from '@/components/alerts/ComplianceAlerts';
 import { ComplianceCard } from '@/components/compliance/ComplianceCard';
@@ -12,15 +12,17 @@ import { ScoreboardCard } from '@/components/scoreboard/ScoreboardCard';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { Footer } from '@/components/shared/Footer';
 import { SectionHeading } from '@/components/shared/SectionHeading';
-import { Button } from '@/components/ui/button';
 import { TeaActionConsole } from '@/components/tea/TeaActionConsole';
 import { TeapotBadge } from '@/components/tea/TeapotBadge';
 import { TeaStatusPanel } from '@/components/tea/TeaStatusPanel';
+import { TacticalActions } from '@/components/tea/TacticalActions';
+import { KettleSliders } from '@/components/tea/KettleSliders';
+import { TeaFactTicker } from '@/components/tea/TeaFactTicker';
 import { SEEDED_MATCH, SEEDED_TEA } from '@/lib/constants';
 import { computeComplianceScore } from '@/lib/domain/complianceEngine';
 import type { TeaState } from '@/lib/schemas/domain';
 
-const actions = [
+const TACTICAL_ACTIONS = [
   'Recommend Batting Aggression',
   'Run Toss Analysis',
   'Approve Powerplay Acceleration',
@@ -28,14 +30,29 @@ const actions = [
   'Override Tea Protocol'
 ] as const;
 
+type TacticalActionId = (typeof TACTICAL_ACTIONS)[number];
+
+type ConsoleResponse = {
+  success?: boolean;
+  error?: { code?: string; title?: string; message?: string; recoveryAction?: string; details?: string[] };
+  data?: Record<string, unknown>;
+  meta?: { action?: string; httpStatus?: number | null; ok?: boolean; at?: string };
+};
+
+const INITIAL_RESPONSE: ConsoleResponse = {
+  success: true,
+  data: { message: 'Awaiting tactical instruction. Tea governance is standing by.' }
+};
+
 export default function HomePage() {
   const router = useRouter();
   const [teaState, setTeaState] = useState<TeaState>(SEEDED_TEA);
-  const [response, setResponse] = useState<unknown>({ success: true, data: { message: 'Awaiting tactical instruction.' } });
+  const [response, setResponse] = useState<ConsoleResponse>(INITIAL_RESPONSE);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+
   const score = useMemo(() => computeComplianceScore(teaState), [teaState]);
 
-  const callApi = async (label: string, url: string, body: unknown) => {
+  const callApi = useCallback(async (label: string, url: string, body: unknown) => {
     setPendingAction(label);
     try {
       const res = await fetch(url, {
@@ -43,7 +60,6 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-
       const json = await res.json().catch(() => ({}));
       setResponse({
         ...json,
@@ -73,65 +89,142 @@ export default function HomePage() {
     } finally {
       setPendingAction(null);
     }
-  };
+  }, []);
 
-  const runAction = async (action: (typeof actions)[number]) => {
-    await callApi(action, '/api/tactical-action', { action, teaState, matchState: SEEDED_MATCH });
-  };
+  const runAction = useCallback(
+    (action: TacticalActionId) => {
+      callApi(action, '/api/tactical-action', {
+        action,
+        teaState,
+        matchState: SEEDED_MATCH
+      });
+    },
+    [callApi, teaState]
+  );
 
-  const handleStartMatch = async () => {
-    await callApi('Start Match', '/api/toss', { teaState, matchState: SEEDED_MATCH });
-  };
+  const handleStartMatch = useCallback(() => {
+    callApi('Start Match', '/api/toss', { teaState, matchState: SEEDED_MATCH });
+  }, [callApi, teaState]);
 
-  const handleTriggerAudit = async () => {
-    await callApi('Trigger Emergency Tea Audit', '/api/tea-compliance', teaState);
-  };
+  const handleTriggerAudit = useCallback(() => {
+    callApi('Trigger Emergency Tea Audit', '/api/tea-compliance', teaState);
+  }, [callApi, teaState]);
 
-  const handleViewDemo = () => {
+  const handleViewDemo = useCallback(() => {
     router.push('/demo');
-  };
+  }, [router]);
+
+  const handleSliderChange = useCallback(
+    (key: keyof Omit<TeaState, 'teaMode'>, value: number) => {
+      setTeaState((prev) => ({ ...prev, [key]: value }));
+    },
+    []
+  );
+
+  const isBusy = Boolean(pendingAction);
 
   return (
-    <div>
+    <div className='min-h-screen'>
       <AppHeader />
       <DashboardShell>
+        {/* Hero */}
         <Hero
-          isBusy={Boolean(pendingAction)}
+          isBusy={isBusy}
           onStartMatch={handleStartMatch}
           onTriggerAudit={handleTriggerAudit}
           onViewDemo={handleViewDemo}
         />
-        <TeapotBadge />
+
+        {/* Status bar */}
+        <div className='flex flex-wrap items-center justify-between gap-3'>
+          <TeapotBadge />
+          {isBusy && (
+            <p className='flex items-center gap-1.5 font-mono text-xs text-muted'>
+              <span className='inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent' />
+              Running: {pendingAction}…
+            </p>
+          )}
+        </div>
+
+        {/* Scoreboard */}
         <ScoreboardCard
           teams={SEEDED_MATCH.teams}
           score={SEEDED_MATCH.score}
           overs={SEEDED_MATCH.overs}
           requiredRate={SEEDED_MATCH.requiredRate}
           tossStatus={SEEDED_MATCH.tossStatus}
+          format={SEEDED_MATCH.format}
+          matchStatus={SEEDED_MATCH.matchStatus}
         />
-        <SectionHeading title='Tea Compliance Engine' subtitle='Structured governance for cricket tactical operations.' />
-        <TeaModeSelector value={teaState.teaMode} onChange={(mode) => setTeaState({ ...teaState, teaMode: mode as typeof teaState.teaMode })} />
+
+        {/* Compliance Engine */}
+        <SectionHeading
+          tag='Core Engine'
+          title='Tea Compliance Engine'
+          subtitle='Structured governance for cricket tactical operations. All actions evaluated in real-time.'
+        />
+
+        {/* Tea Mode Selector */}
+        <TeaModeSelector
+          value={teaState.teaMode}
+          onChange={(mode) => setTeaState((prev) => ({ ...prev, teaMode: mode }))}
+        />
+
+        {/* Metrics */}
         <MetricsGrid
           metrics={[
-            { label: 'Tea Compliance Score', value: score },
-            { label: 'Kettle Readiness Index', value: teaState.kettleReadiness },
-            { label: 'Biscuit Coverage Ratio', value: teaState.biscuitCoverage }
+            {
+              label: 'Tea Compliance Score',
+              value: score,
+              icon: '📊',
+              description: 'Weighted composite: kettle 35%, biscuit 25%, hydration 20%, confidence 20%'
+            },
+            {
+              label: 'Kettle Readiness Index',
+              value: teaState.kettleReadiness,
+              icon: '🫖',
+              description: 'Critical path metric. Gate for toss analysis and tactical approvals.'
+            },
+            {
+              label: 'Biscuit Coverage Ratio',
+              value: teaState.biscuitCoverage,
+              icon: '🍪',
+              description: 'Required for batting aggression authorization.'
+            }
           ]}
         />
+
+        {/* Status + Controls */}
         <div className='grid gap-4 md:grid-cols-2'>
           <TeaStatusPanel teaState={teaState} score={score} />
-          <ComplianceCard title='Tea Mode' value={teaState.teaMode} />
+          <div className='paper-card rounded-2xl p-4'>
+            <KettleSliders teaState={teaState} onChange={handleSliderChange} />
+            <div className='mt-4 border-t border-cream-deep pt-4'>
+              <ComplianceCard title='Active Tea Mode' value={teaState.teaMode} />
+            </div>
+          </div>
         </div>
-        <section className='grid gap-2 md:grid-cols-3'>
-          {actions.map((action) => (
-            <Button disabled={Boolean(pendingAction)} key={action} onClick={() => runAction(action)}>
-              {action}
-            </Button>
-          ))}
-        </section>
-        {pendingAction ? <p className='text-sm text-slate-600'>Running: {pendingAction}…</p> : null}
+
+        {/* Tactical Actions */}
+        <SectionHeading
+          tag='Operations'
+          title='Tactical Action Console'
+          subtitle='Submit decisions to the Tea Compliance Engine. Results appear in the response console below.'
+        />
+        <TacticalActions
+          onAction={runAction}
+          isBusy={isBusy}
+          pendingAction={pendingAction}
+        />
+
+        {/* Response console */}
         <TeaActionConsole response={response} />
-        <ComplianceAlerts />
+
+        {/* Info row */}
+        <div className='grid gap-4 md:grid-cols-2'>
+          <ComplianceAlerts />
+          <TeaFactTicker />
+        </div>
       </DashboardShell>
       <Footer />
     </div>
