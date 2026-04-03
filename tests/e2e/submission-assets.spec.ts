@@ -43,7 +43,7 @@ test('capture 418 failure state', async ({ page }) => {
 
   const responseConsole = page.getByLabel('API response output');
   await expect(responseConsole).toBeVisible();
-  await expect(page.getByText('Run Toss Analysis', { exact: true })).toBeVisible();
+  await expect(responseConsole).toContainText('Run Toss Analysis');
   await expect(responseConsole).not.toContainText('Awaiting tactical instruction.');
   await expect(responseConsole).toContainText('\"status\": 418');
   await expect(responseConsole).toContainText("I'm a teapot");
