@@ -4,12 +4,42 @@ import { runTossAnalysis } from '@/lib/domain/tossEngine';
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
+
+  if (body === null) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INVALID_JSON',
+          title: 'Malformed request',
+          message: 'Request body must be valid JSON.',
+          recoveryAction: 'Check Content-Type header.'
+        }
+      },
+      { status: 400 }
+    );
+  }
+
   const parsed = complianceRequestSchema.safeParse(body);
+
   if (!parsed.success) {
-    return NextResponse.json({ success: false, error: { code: 'INVALID_PAYLOAD', title: 'Invalid request', message: 'Payload validation failed.', recoveryAction: 'Review request schema.' } }, { status: 400 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'INVALID_PAYLOAD',
+          title: 'Validation failed',
+          message: 'Payload validation failed.',
+          recoveryAction: 'Review request schema.',
+          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
+        }
+      },
+      { status: 400 }
+    );
   }
 
   const result = runTossAnalysis(parsed.data.teaState, parsed.data.matchState);
+
   if (!result.allowed) {
     return NextResponse.json(
       {
@@ -18,6 +48,7 @@ export async function POST(req: Request) {
         data: {
           blocked: true,
           complianceScore: result.score,
+          grade: result.grade,
           reasons: result.reasons,
           canonicalStatus: 418
         }
@@ -25,5 +56,6 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   }
+
   return NextResponse.json({ success: true, data: result.data });
 }
