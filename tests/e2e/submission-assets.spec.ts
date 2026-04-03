@@ -18,7 +18,8 @@ test('capture dashboard metrics', async ({ page }) => {
   await expect(page.getByText('Tea Compliance Score')).toBeVisible();
   await expect(page.getByText('Kettle Readiness Index')).toBeVisible();
   await expect(page.getByText('Biscuit Coverage Ratio')).toBeVisible();
-  await expect(page.getByText('Scoreboard')).toBeVisible();
+  await expect(page.getByText('Peakhurst Panthers', { exact: false })).toBeVisible();
+  await expect(page.getByText('St George Strikers', { exact: false })).toBeVisible();
 
   await page.screenshot({ path: `${outputDir}/dashboard-metrics.png`, fullPage: false });
 });
@@ -27,8 +28,8 @@ test('capture 418 failure state', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Toss Analysis' }).click();
 
-  await expect(page.getByText('418')).toBeVisible();
-  await expect(page.getByText("I'm a teapot")).toBeVisible();
+  await expect(page.getByText('HTTP 418', { exact: false })).toBeVisible();
+  await expect(page.getByText("I'm a teapot", { exact: false })).toBeVisible();
 
   await page.screenshot({ path: `${outputDir}/418-failure.png`, fullPage: false });
 });
@@ -37,7 +38,7 @@ test('capture override tea protocol failure', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Override Tea Protocol' }).click();
 
-  await expect(page.getByText('418')).toBeVisible();
+  await expect(page.getByText('HTTP 418', { exact: false })).toBeVisible();
 
   await page.screenshot({ path: `${outputDir}/override-failure.png`, fullPage: false });
 });
