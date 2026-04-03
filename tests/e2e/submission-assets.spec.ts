@@ -6,12 +6,7 @@ const outputDir = 'submission-assets';
 async function setSliderValue(page: import('@playwright/test').Page, sliderId: string, value: number) {
   const slider = page.locator(`#${sliderId}`);
   await expect(slider).toBeVisible();
-  await slider.evaluate((el: HTMLInputElement, next: number) => {
-    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-    valueSetter?.call(el, String(next));
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }, value);
+  await slider.fill(String(value));
   await expect(slider).toHaveValue(String(value));
 }
 
@@ -39,13 +34,15 @@ test('capture dashboard metrics', async ({ page }) => {
 test('capture 418 failure state', async ({ page }) => {
   await page.goto('/');
   await setSliderValue(page, 'slider-kettleReadiness', 10);
-  await page.getByRole('button', { name: 'Toss Analysis' }).click();
+  const tossAnalysisAction = page.getByRole('button', { name: 'Toss Analysis' });
+  await expect(tossAnalysisAction).toBeEnabled();
+  await tossAnalysisAction.click();
 
   const responseConsole = page.getByLabel('API response output');
   await expect(responseConsole).toBeVisible();
+  await expect(responseConsole).toContainText('\"status\": 418');
   await expect(responseConsole).toContainText('Run Toss Analysis');
   await expect(responseConsole).not.toContainText('Awaiting tactical instruction.');
-  await expect(responseConsole).toContainText('\"status\": 418');
   await expect(responseConsole).toContainText("I'm a teapot");
 
   await page.screenshot({ path: `${outputDir}/418-failure.png`, fullPage: false });
