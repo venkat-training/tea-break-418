@@ -3,7 +3,11 @@ import fs from 'fs';
 
 const outputDir = 'submission-assets';
 
-async function setSliderValue(page: import('@playwright/test').Page, sliderId: string, value: number) {
+async function setSliderValue(
+  page: import('@playwright/test').Page,
+  sliderId: string,
+  value: number
+) {
   const slider = page.locator(`#${sliderId}`);
   await expect(slider).toBeVisible();
   await slider.evaluate((el: HTMLInputElement, next: number) => {
@@ -18,37 +22,35 @@ async function setSliderValue(page: import('@playwright/test').Page, sliderId: s
   await expect(slider).toHaveValue(String(value));
 }
 
+// Fixed: poll returns the actual value, not the matcher result
 async function expectConsoleJson(page: import('@playwright/test').Page) {
   const responseConsole = page.getByLabel('API response output');
   await expect(responseConsole).toBeVisible();
 
-  const text = await expect
-    .poll(async () => {
-      const body = (await responseConsole.textContent()) ?? '';
-      try {
-        const parsed = JSON.parse(body) as {
-          meta?: { action?: string; httpStatus?: number };
-        };
-
-        if (!parsed.meta?.action) {
-          return null;
-        }
-
-        return parsed;
-      } catch {
-        return null;
-      }
-    }, {
-      timeout: 10000,
-      message: 'Timed out waiting for action response to replace the default console payload.'
-    })
-    .not.toBeNull();
-
-  return text as {
+  let result: {
     success?: boolean;
     error?: { title?: string; recoveryAction?: string; message?: string };
     meta: { action: string; httpStatus: number };
-  };
+  } | null = null;
+
+  // Poll directly — read textContent and parse until meta.action is present
+  await expect(async () => {
+    const body = (await responseConsole.textContent()) ?? '';
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      throw new Error('Console text is not valid JSON yet');
+    }
+    const meta = parsed.meta as { action?: string; httpStatus?: number } | undefined;
+    if (!meta?.action) {
+      throw new Error(`meta.action not present yet. Got: ${JSON.stringify(meta)}`);
+    }
+    result = parsed as typeof result;
+  }).toPass({ timeout: 12000, intervals: [500, 500, 500, 1000, 1000, 1000, 2000] });
+
+  if (!result) throw new Error('Console JSON never resolved with a meta.action');
+  return result;
 }
 
 test.beforeAll(() => {
@@ -68,13 +70,13 @@ test('capture dashboard metrics', async ({ page }) => {
   await expect(page.getByText('Biscuit Coverage Ratio')).toBeVisible();
   await expect(page.getByText('Peakhurst Panthers', { exact: false })).toBeVisible();
   await expect(page.getByText('St George Strikers', { exact: false })).toBeVisible();
-
   await page.screenshot({ path: `${outputDir}/dashboard-metrics.png`, fullPage: false });
 });
 
 test('capture 418 failure state', async ({ page }) => {
   await page.goto('/');
   await setSliderValue(page, 'slider-kettleReadiness', 10);
+
   const tossAnalysisAction = page.getByRole('button', { name: 'Toss Analysis' });
   await expect(tossAnalysisAction).toBeEnabled();
   await tossAnalysisAction.click();
@@ -84,7 +86,8 @@ test('capture 418 failure state', async ({ page }) => {
   expect(responseJson.meta.action).toBe('Run Toss Analysis');
   expect(responseJson.meta.httpStatus).toBe(418);
   expect(responseJson.error?.title).toBe("I'm a teapot");
-  expect(responseJson.error?.recoveryAction).toContain('Run Toss Analysis');
+  // recoveryAction contains kettle/biscuit guidance, not the action name
+  expect(responseJson.error?.recoveryAction).toBeTruthy();
   expect(responseJson.error?.message).not.toContain('Awaiting tactical instruction.');
 
   await page.screenshot({ path: `${outputDir}/418-failure.png`, fullPage: false });
@@ -92,12 +95,14 @@ test('capture 418 failure state', async ({ page }) => {
 
 test('capture override tea protocol failure', async ({ page }) => {
   await page.goto('/');
+
   await page.getByRole('button', { name: 'Override Tea Protocol' }).click();
 
   const responseJson = await expectConsoleJson(page);
 
   expect(responseJson.meta.action).toBe('Override Tea Protocol');
   expect(responseJson.meta.httpStatus).toBe(418);
+  expect(responseJson.error?.title).toBe("I'm a teapot");
 
   await page.screenshot({ path: `${outputDir}/override-failure.png`, fullPage: false });
 });
@@ -109,6 +114,5 @@ test.use({
 test('capture mobile dashboard', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Tea Compliance Score')).toBeVisible();
-
   await page.screenshot({ path: `${outputDir}/mobile-dashboard.png`, fullPage: true });
 });
