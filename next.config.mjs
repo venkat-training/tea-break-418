@@ -1,16 +1,21 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production';
 
+const scriptSrc = isDev
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
+
 const cspDirectives = [
   "default-src 'self'",
-  "img-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  isDev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    : "script-src 'self'",
-  "object-src 'none'",
+  scriptSrc,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob:",
+  "connect-src 'self' https:",
+  "frame-ancestors 'none'",
   "base-uri 'self'",
-  "frame-ancestors 'none'"
+  "form-action 'self'",
+  "object-src 'none'"
 ].join('; ');
 
 const nextConfig = {
