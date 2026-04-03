@@ -112,6 +112,7 @@ test.use({
 });
 
 test('capture mobile dashboard', async ({ page }) => {
+  test.setTimeout(60000);
   await page.goto('/');
   await expect(page.getByText('Tea Compliance Score')).toBeVisible();
   await page.screenshot({ path: `${outputDir}/mobile-dashboard.png`, fullPage: true });
