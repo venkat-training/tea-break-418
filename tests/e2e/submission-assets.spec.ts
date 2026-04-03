@@ -28,8 +28,10 @@ test('capture 418 failure state', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Toss Analysis' }).click();
 
-  await expect(page.getByText('HTTP 418', { exact: false })).toBeVisible();
-  await expect(page.getByText("I'm a teapot", { exact: false })).toBeVisible();
+  const responseConsole = page.getByLabel('API response output');
+  await expect(responseConsole).toBeVisible();
+  await expect(responseConsole).toContainText('\"status\": 418');
+  await expect(responseConsole).toContainText("I'm a teapot");
 
   await page.screenshot({ path: `${outputDir}/418-failure.png`, fullPage: false });
 });
@@ -38,7 +40,9 @@ test('capture override tea protocol failure', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Override Tea Protocol' }).click();
 
-  await expect(page.getByText('HTTP 418', { exact: false })).toBeVisible();
+  const responseConsole = page.getByLabel('API response output');
+  await expect(responseConsole).toBeVisible();
+  await expect(responseConsole).toContainText('\"status\": 418');
 
   await page.screenshot({ path: `${outputDir}/override-failure.png`, fullPage: false });
 });
