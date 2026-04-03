@@ -13,7 +13,11 @@ async function setSliderValue(page: Page, sliderId: string, value: number) {
   const slider = page.locator(`#${sliderId}`);
   await expect(slider).toBeVisible();
   await slider.evaluate((el: HTMLInputElement, next: number) => {
-    el.value = String(next);
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    valueSetter?.call(el, String(next));
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, value);
@@ -64,16 +68,17 @@ test.describe('Tea Break 418 — Smoke Test Suite', () => {
     await page.getByRole('button', { name: /Start Match/i }).click();
 
     // Wait for response console to update
-    await waitForConsoleUpdate(page, 'TEA_BREAK_ENFORCED');
+    await waitForConsoleUpdate(page, '"action": "Start Match"');
 
-    const console = page.locator('pre[aria-live="polite"]');
-    const text = await console.textContent();
+    const responseConsole = page.locator('pre[aria-live="polite"]');
+    const text = await responseConsole.textContent();
     const json = JSON.parse(text || '{}');
 
     expect(json.success).toBe(false);
     expect(json.meta.httpStatus).toBe(200);
     expect(json.data.canonicalStatus).toBe(418);
     expect(json.data.blocked).toBe(true);
+    expect(json.error.code).toBe('TEA_BREAK_ENFORCED');
 
     console.log('✅ 2. Start Match correctly returns 418 — kettle not ready');
   });
@@ -198,8 +203,18 @@ test.describe('Tea Break 418 — Smoke Test Suite', () => {
     await expect(page.getByRole('heading', { name: /Tea Break 418 Demo/i })).toBeVisible();
 
     // All 6 steps should be present
-    for (let i = 1; i <= 6; i++) {
-      await expect(page.getByText(String(i))).toBeVisible();
+    const expectedSteps = [
+      'Observe Toss Block',
+      'Audit Tea State',
+      'Adjust Parameters',
+      'Switch Tea Mode',
+      'Attempt Override',
+      'Inspect Response Console'
+    ];
+
+    await expect(page.locator('ol > li')).toHaveCount(6);
+    for (const stepTitle of expectedSteps) {
+      await expect(page.getByText(stepTitle, { exact: true })).toBeVisible();
     }
 
     // Return link works
