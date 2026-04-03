@@ -6,7 +6,15 @@ const outputDir = 'submission-assets';
 async function setSliderValue(page: import('@playwright/test').Page, sliderId: string, value: number) {
   const slider = page.locator(`#${sliderId}`);
   await expect(slider).toBeVisible();
-  await slider.fill(String(value));
+  await slider.evaluate((el: HTMLInputElement, next: number) => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    valueSetter?.call(el, String(next));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
   await expect(slider).toHaveValue(String(value));
 }
 
